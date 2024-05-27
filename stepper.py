@@ -1,4 +1,4 @@
-import time
+import utime as time
 
 # only test for uln2003
 class Stepper:
@@ -25,12 +25,12 @@ class Stepper:
         if mode=='FULL_STEP':
             self.mode = self.FULL_STEP
         else:
-        self.mode = self.HALF_STEP
-        self.pin1 = pin1
-        self.pin2 = pin2
-        self.pin3 = pin3
-        self.pin4 = pin4
-        self.delay = delay  # Recommend 10+ for FULL_STEP, 1 is OK for HALF_STEP
+            self.mode = self.HALF_STEP
+            self.pin1 = pin1
+            self.pin2 = pin2
+            self.pin3 = pin3
+            self.pin4 = pin4
+            self.delay = delay  # Recommend 10+ for FULL_STEP, 1 is OK for HALF_STEP
         
         # Initialize all to 0
         self.reset()

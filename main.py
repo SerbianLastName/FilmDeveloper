@@ -1,26 +1,46 @@
 from rotary import Rotary
 import utime as time
-from machine import Pin, I2C
-import ssd1306
+from machine import Pin, SoftI2C
+import stepper as Stepper
+import ssd1306, onewire, ds18x20
 
 # CONSTANTS
+OLED_H = 128
+OLED_V = 64
 # PINS
 ROTARY_CLK = 35
 ROTARY_DT = 32
 ROTARY_SW = 33
+
 DISPLAY_SDA = 23
 DISPLAY_SLC = 22
+
+STEPPER_IN1 = 16
+STEPPER_IN2 = 17
+STEPPER_IN3 = 18
+STEPPER_IN4 = 19
+
+TEMP_DAT = 13
+
 
 # Menu List
 mainMenus = ["DEVELOP", "SETTINGS", "TEST"]
 subMenus = [["Color C-41", "Color E-6", "B&W", "B&W Stand"], ["Sound", "Language"], ["Test Stepper"]]
 
 # Initilize Objects
-# Rotary(Dt, Clk, SW)
+# ROTARY => Rotary(Dt, Clk, SW)
 rotary = Rotary(ROTARY_DT, ROTARY_CLK, ROTARY_SW)
 # OLED
-i2c = I2C(sda=Pin(DISPLAY_SDA), scl=Pin(DISPLAY_SLC))
-display = ssd1306.SSD1306_I2C(128, 64, i2c)
+i2c = SoftI2C(sda=Pin(DISPLAY_SDA), scl=Pin(DISPLAY_SLC))
+display = ssd1306.SSD1306_I2C(OLED_H, OLED_V, i2c)
+# TEMP PROBE
+dsPin = Pin(TEMP_DAT)
+dsSensor = ds18x20.DS18X20(onewire.OneWire(dsPin))
+tempProbe = dsSensor.scan()[0]
+# STEPPER
+stepper = Stepper.create(Pin(STEPPER_IN1, Pin.OUT), Pin(STEPPER_IN2, Pin.OUT), Pin(STEPPER_IN3, Pin.OUT), Pin(STEPPER_IN4, Pin.OUT), delay = 2)
+stepper.angle(360)
+
 
 menuVal = 0
 subMenuVal = 0
