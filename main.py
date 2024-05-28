@@ -1,4 +1,4 @@
-from rotary import Rotary
+# from rotary import Rotary
 import utime as time
 from machine import Pin, SoftI2C
 import stepper as Stepper
@@ -7,10 +7,12 @@ import ssd1306, onewire, ds18x20
 # CONSTANTS
 OLED_H = 128
 OLED_V = 64
+CLICK_BOUNCE = 350 # Time in MS after a click to ignore a second click
+SPIN_BOUNCE = 100
 # PINS
 ROTARY_CLK = 35
 ROTARY_DT = 32
-ROTARY_SW = 33
+ROTARY_SW = 34
 
 DISPLAY_SDA = 23
 DISPLAY_SLC = 22
@@ -29,7 +31,11 @@ subMenus = [["Color C-41", "Color E-6", "B&W", "B&W Stand"], ["Sound", "Language
 
 # Initilize Objects
 # ROTARY => Rotary(Dt, Clk, SW)
-rotary = Rotary(ROTARY_DT, ROTARY_CLK, ROTARY_SW)
+# rotary = Rotary(ROTARY_DT, ROTARY_CLK, ROTARY_SW)
+rotaryDtPin = Pin(ROTARY_DT, Pin.IN)
+rotaryClkPin = Pin(ROTARY_CLK, Pin.IN)
+rotarySwPin = Pin(ROTARY_SW, Pin.IN, )
+
 # OLED
 i2c = SoftI2C(sda=Pin(DISPLAY_SDA), scl=Pin(DISPLAY_SLC))
 display = ssd1306.SSD1306_I2C(OLED_H, OLED_V, i2c)
@@ -39,18 +45,36 @@ dsSensor = ds18x20.DS18X20(onewire.OneWire(dsPin))
 tempProbe = dsSensor.scan()[0]
 # STEPPER
 stepper = Stepper.create(Pin(STEPPER_IN1, Pin.OUT), Pin(STEPPER_IN2, Pin.OUT), Pin(STEPPER_IN3, Pin.OUT), Pin(STEPPER_IN4, Pin.OUT), delay = 2)
-stepper.angle(360)
+#stepper.angle(360)
 
-
+lastStatus = (rotaryDtPin.value() <<1 | rotaryClkPin.value())
+lastStatusTime = time.ticks_ms()
+lastClick = 0
+lastClickTime = time.ticks_ms()
 menuVal = 0
 subMenuVal = 0
 inSubMenu = False
 
-def rotaryInput(change):
+
+
+def handleSpin(pin):
+    global lastStatus
+    global lastStatusTime
     global menuVal
     global subMenuVal
     global inSubMenu
-    if change == Rotary.ROT_CW:
+    newStatus = (rotaryDtPin.value() << 1 | rotaryClkPin.value())
+    if newStatus == lastStatus:
+        return
+    now = time.ticks_ms()
+    if abs(time.ticks_diff(lastStatusTime, now)) <= SPIN_BOUNCE:
+        print("Time Bounced")
+        return
+    transition = (lastStatus << 2 ) | newStatus
+    lastStatus = newStatus  
+    if transition == 0b1000 or transition == 0b0111:
+        lastStatusTime = now                     
+        print("CW")
         if not inSubMenu:
             if menuVal < (len(mainMenus) - 1):
                 menuVal = menuVal + 1
@@ -63,7 +87,9 @@ def rotaryInput(change):
                 return
             subMenuVal = 0
             return
-    elif change == Rotary.ROT_CCW:
+    if transition == 0b1011 or transition == 0b0100:
+        lastStatusTime = now
+        print("ACW")
         if not inSubMenu:
             if menuVal >= 1:
                 menuVal = menuVal - 1
@@ -76,7 +102,26 @@ def rotaryInput(change):
                 return
             subMenuVal = (len(subMenus[menuVal]) -1)
             return
-    elif change == Rotary.SW_PRESS:
+        
+
+def handleClick(pin):
+    global lastClick
+    global subMenuVal
+    global inSubMenu
+    global lastClickTime
+    newClick = rotarySwPin.value()
+    if lastClick == newClick:
+        return
+    now = time.ticks_ms()
+    if abs(time.ticks_diff(lastClickTime, now)) <= CLICK_BOUNCE:
+        print(time.ticks_diff(lastClickTime, now))
+        print("Click Bounced")
+        return
+    transition = (lastClick << 2 ) | newClick
+    if transition == 0b01:
+        print("Button Pressed")
+        print(time.ticks_diff(lastClickTime, now))
+        lastClickTime = now
         if not inSubMenu:
             subMenuVal = 0
             inSubMenu = True
@@ -86,6 +131,9 @@ def rotaryInput(change):
             inSubMenu = False
             time.sleep(0.25)
             return
+    lastClick = newClick
+    time.sleep(0.15)
+
         
 def drawDisplay():
     display.fill(0)
@@ -122,11 +170,18 @@ def drawDisplay():
                 display.text(subMenus[menuVal][3], 3, 50, 1)
             
     display.show()
-        
-rotary.add_handler(rotaryInput)
+
+# Initilize Rotary Input IRQs
+rotaryDtPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
+rotaryClkPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
+# rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
+rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
+
+
 
 
 
 while True:
     drawDisplay()
-    time.sleep(0.15)
+    # print(rotaryDtPin.value(), rotaryClkPin.value(), rotarySwPin.value())
+    time.sleep(0.1)
