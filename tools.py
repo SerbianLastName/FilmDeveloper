@@ -20,12 +20,23 @@ def getNewTime(temp, type):
                 higherTemp = devTemp
                 higherTime = devTime
     if lowerTemp == 0:
-        return "Temp too low"
+        lowerTemp = higherTemp
+        lowerTime = higherTime
+        higherTemp = 100
+        for devTemp, devTime in CONST.tempTimes[type].items():
+            if devTemp > lowerTemp:
+                if devTemp < higherTemp:
+                    higherTemp = devTemp
+                    higherTime = devTime
     if higherTemp == 0:
-        return "Temp too high"    
+        higherTemp = lowerTemp
+        higherTime = lowerTime
+        lowerTemp = 0
+        for devTemp, devTime in CONST.tempTimes[type].items():
+            if devTemp < higherTemp:
+                if devTemp > lowerTemp:
+                    lowerTemp = devTemp
+                    lowerTime = devTime
     slope = (higherTime - lowerTime) / (higherTemp - lowerTemp)
     newTime = lowerTime + (slope * (temp - lowerTemp))   
     return round(newTime, 2)
-
-foo = getNewTime(31.3463, "Push 1")
-print(foo)
