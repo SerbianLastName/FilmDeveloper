@@ -1,42 +1,30 @@
-menuText = [["DEVELOP",
-            ["Color C-41", "Color E-6", "B&W", "Back"],
-            ["Setup", "Back"],
-            ["Over/Under Develop", "Agitation"]],
-            ["SETTINGS",
-            ["Sound", "Language", "Back"]],
-            ["TEST",
-            ["Test Stepper", "Back"]]]
+# CONSTANTS
 
-# LIDI = List Dictionary.  There is definitely a better way to do this.
-menuLidi = [
-    ["DEVELOP",
-        [
-            ["Color", 
-                {
-                    "Developer": ["C-41", "E-6", "ECN-2", "Other", "Back"],
-                    "Agitation": ["Normal", "Constant", "Custom Interval", "Back"],
-                    "Push/Pull": ["Normal", "Push 1", "Push 2", "Push 3", "Pull 1", "Custom", "Back"],                    
-                }
-            ],
-            ["B&W",
-                {
-                    "Developer": ["C-76", "HC", "Rodinal", "Other", "Back"],
-                    "Film Stock": ["T-Max 400", "Tri-X 400", "HP-5", "Fomapan 400", "T-Max 3200"],
-                }
-            ],            
-            ["Manual",
-                {
-                    "modes": ["Setup", "Back"],
-                }
-            ],
-            ["User Preset",
-                {
-                    "modes": ["Browse", "Back"],
-                }
-            ],
-        ]
-    ]
-]
+# OLED SIZE.  You could use a different size, but the menu system would probably be fucked.
+OLED_H = 128
+OLED_V = 64
+
+# Digita, isn't digital.
+CLICK_BOUNCE = 350 # Time in MS after a click to ignore a second click
+SPIN_BOUNCE = 25
+
+# PINS
+# Rotary
+# KY 070 rotary encoders from Amazon need to have grnd/+ wiring reversed to work, it's kinda silly
+ROTARY_CLK = 35
+ROTARY_DT = 32
+ROTARY_SW = 34
+# Display
+DISPLAY_SDA = 23
+DISPLAY_SLC = 22
+# Stepper
+STEPPER_IN1 = 16
+STEPPER_IN2 = 17
+STEPPER_IN3 = 18
+STEPPER_IN4 = 19
+# Temp Probe
+TEMP_DAT = 13
+# Other GPIO pins should work, these are just what I happened to use
 
 tempTimes = {   "Normal": 
                 {
