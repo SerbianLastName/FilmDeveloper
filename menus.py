@@ -7,35 +7,63 @@ menuText = [["DEVELOP",
             ["TEST",
             ["Test Stepper", "Back"]]]
 
-# LIDI = List Dictionary.  There is definitely a better way to do this.
-menuLidi = [
-    ["DEVELOP",
-        [
-            ["Color", 
-                {
-                    "Developer": ["C-41", "E-6", "ECN-2", "Other", "Back"],
-                    "Agitation": ["Normal", "Constant", "Custom Interval", "Back"],
-                    "Push/Pull": ["Normal", "Push 1", "Push 2", "Push 3", "Pull 1", "Custom", "Back"],                    
-                }
+# I feel like, maybe, a dictionary would be better here, but whatever.
+menus =   [["DEVELOP",
+                [
+                [["DEVELOP COLOR"], 
+                [
+                    [["Developer"],
+                    ["C-41", "E-6", "ECN-2", "Other"]],
+                    [["Agitation"],
+                    ["Normal", "Constant", "Custom Interval"]],
+                    [["Push/Pull"],
+                    [-1,0,1,2,3]],
+                    ["Back"]                    
+                ]],
+                [["DEVELOP B&W"], 
+                [
+                    [["Developer"],
+                    ["C-76", "HC", "Rodinal", "Other"]],
+                    [["Developer"],
+                    ["T-Max 400", "Tri-X 400", "HP-5", "Fomapan 400", "T-Max 3200"]],
+                    [["Agitation"],
+                    ["Normal", "Constant", "Custom Interval",]],
+                    [["Push/Pull"],
+                    [-1,0,1,2,3]],
+                    ["Back"]                       
+                ]],
+                [["BACK"]]
+                ],
             ],
-            ["B&W",
-                {
-                    "Developer": ["C-76", "HC", "Rodinal", "Other", "Back"],
-                    "Film Stock": ["T-Max 400", "Tri-X 400", "HP-5", "Fomapan 400", "T-Max 3200"],
-                }
-            ],            
-            ["Manual",
-                {
-                    "modes": ["Setup", "Back"],
-                }
+            ["DEVELOP 2",
+                [
+                [["DEVELOP COLOR"], 
+                [
+                    [["Developer"],
+                    ["C-41", "E-6", "ECN-2", "Other"]],
+                    [["Agitation"],
+                    ["Normal", "Constant", "Custom Interval"]],
+                    [["Push/Pull"],
+                    [-1,0,1,2,3]],
+                    ["Back"]                    
+                ]],
+                [["DEVELOP B&W"], 
+                [
+                    [["Developer"],
+                    ["C-76", "HC", "Rodinal", "Other"]],
+                    [["Developer"],
+                    ["T-Max 400", "Tri-X 400", "HP-5", "Fomapan 400", "T-Max 3200"]],
+                    [["Agitation"],
+                    ["Normal", "Constant", "Custom Interval",]],
+                    [["Push/Pull"],
+                    [-1,0,1,2,3]],
+                    ["Back"]                       
+                ]],
+                [["BACK"]]
+                ],
             ],
-            ["User Preset",
-                {
-                    "modes": ["Browse", "Back"],
-                }
-            ],
-        ]
-    ]
+            
+    
 ]
 
 tempTimes = {   "Normal": 

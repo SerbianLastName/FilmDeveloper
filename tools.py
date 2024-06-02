@@ -1,13 +1,12 @@
 import constants as CONST
 
-
 def getNewTime(temp, type):
     lowerTemp = 0
     lowerTime = 0
     higherTemp = 100
     higherTime = 0
     if type == "custom":
-        pass
+        return 00.00
     for devTemp, devTime in CONST.tempTimes[type].items():
         if devTemp == temp:
             return devTime
@@ -37,6 +36,9 @@ def getNewTime(temp, type):
                 if devTemp > lowerTemp:
                     lowerTemp = devTemp
                     lowerTime = devTime
-    slope = (higherTime - lowerTime) / (higherTemp - lowerTemp)
+    slope = (higherTime - lowerTime) / (higherTemp - lowerTemp) # I don't think I need to worry about dividing by 0 here
     newTime = lowerTime + (slope * (temp - lowerTemp))   
     return round(newTime, 2)
+
+def halfStepPushPull(steps):
+    pass
