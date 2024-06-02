@@ -26,7 +26,7 @@ STEPPER_IN4 = 19
 TEMP_DAT = 13
 # Other GPIO pins should work, these are just what I happened to use
 
-tempTimes = {   "Normal": 
+tempTimes = {   "C-41 0": 
                 {
                     22.0 : 50.00,
                     24.0 : 35.00,
@@ -36,7 +36,7 @@ tempTimes = {   "Normal":
                     35.0 : 5.75,
                     39.0 : 3.50,
                 },
-                "Push 1" :
+                "C-41 +1" :
                 {                    
                     24.0 : 50.00,
                     27.0 : 28.00,
@@ -45,7 +45,7 @@ tempTimes = {   "Normal":
                     35.0 : 7.50,
                     39.0 : 4.55,
                 },
-                "Push 2" :
+                "C41 +2" :
                 {                    
                     27.0 : 37.00,
                     29.5 : 25.00,
@@ -53,14 +53,14 @@ tempTimes = {   "Normal":
                     35.0 : 10.00,
                     39.0 : 6.73,
                 },
-                "Push 3" :
+                "C41 +3" :
                 {                    
                     29.5 : 35.00,
                     32.0 : 21.00,
                     35.0 : 14.33,
                     39.0 : 8.75,
                 },
-                "Pull 1" :
+                "C41 -1" :
                 {                    
                     24.0 : 27.00,
                     27.0 : 16.25,

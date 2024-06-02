@@ -12,27 +12,33 @@ menus =   [["DEVELOP",
                 [
                 [["DEVELOP COLOR"], 
                 [
-                    [["Developer"],
-                    ["C-41", "E-6", "ECN-2", "Other"]],
-                    [["Agitation"],
-                    ["Normal", "Constant", "Custom Interval"]],
-                    [["Push/Pull"],
-                    [-1,0,1,2,3]],
-                    ["Back"]                    
+                    [["DEVELOPER"],
+                    ["C-41", "E-6", "ECN2"]],
+                    [["AGITATION"],
+                    ["NORM", "CNST"]],
+                    [["PUSH/PULL"],
+                    ["-1","0","+1","+2","+3"]],
+                    [["START"], ["","CONFIRM"]],    
+                    [["BACK"], ["",""]]                  
                 ]],
                 [["DEVELOP B&W"], 
                 [
-                    [["Developer"],
+                    [["DEVELOPER"],
                     ["C-76", "HC", "Rodinal", "Other"]],
-                    [["Developer"],
-                    ["T-Max 400", "Tri-X 400", "HP-5", "Fomapan 400", "T-Max 3200"]],
-                    [["Agitation"],
-                    ["Normal", "Constant", "Custom Interval",]],
+                    [["FILM"],
+                    ["T-MAX 400", "TRI-X 400", "HP-5", "FOMA 400", "T-MAX 3200"]],
                     [["Push/Pull"],
-                    [-1,0,1,2,3]],
-                    ["Back"]                       
+                    ["-1","0","+1","+2","+3"]],
+                    [["AGITATION"],
+                    ["NORM", "CNST"]],                    
+                    [["START"], ["","CONFIRM"]],                     
+                    [["BACK"], ["",""]],                       
                 ]],
-                [["BACK"]]
+                [["BACK"], 
+                [
+                    [["BACK"],
+                    ["",""]]                      
+                ]],
                 ],
             ],
             ["DEVELOP 2",
@@ -44,26 +50,26 @@ menus =   [["DEVELOP",
                     [["Agitation"],
                     ["Normal", "Constant", "Custom Interval"]],
                     [["Push/Pull"],
-                    [-1,0,1,2,3]],
-                    ["Back"]                    
+                    [-1,0,+1,+2,+3]],
+                    [["BACK"], [""]]                    
                 ]],
                 [["DEVELOP B&W"], 
                 [
-                    [["Developer"],
-                    ["C-76", "HC", "Rodinal", "Other"]],
                     [["Developer"],
                     ["T-Max 400", "Tri-X 400", "HP-5", "Fomapan 400", "T-Max 3200"]],
                     [["Agitation"],
                     ["Normal", "Constant", "Custom Interval",]],
                     [["Push/Pull"],
                     [-1,0,1,2,3]],
-                    ["Back"]                       
+                    [["BACK"], [""]]                       
                 ]],
-                [["BACK"]]
+                [["BACK"], 
+                [
+                    [["BACK"],
+                    [""]]                      
+                ]],
                 ],
-            ],
-            
-    
+            ],         
 ]
 
 tempTimes = {   "Normal": 

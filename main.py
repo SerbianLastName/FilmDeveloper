@@ -33,9 +33,12 @@ lastClickTime = time.ticks_ms()
 menuVal = 0
 subMenuVal = 0
 actionMenuVal = 0
+inMainMenu = True
 inMenu = True
 inSubMenu = False
 inActionMenu = False
+inAdjustment = False
+actionMenuValList = [0,0,1,0,0]
 
 
 def handleSpin(pin):
@@ -44,8 +47,10 @@ def handleSpin(pin):
     global menuVal
     global subMenuVal
     global actionMenuVal
+    global inMainMenu
     global inSubMenu
     global inActionMenu
+    global actionMenuValList
     newStatus = (rotaryDtPin.value() << 1 | rotaryClkPin.value())
     if newStatus == lastStatus:
         return
@@ -56,24 +61,33 @@ def handleSpin(pin):
     lastStatus = newStatus  
     if transition == 0b1000 or transition == 0b0111:
         lastStatusTime = now                     
-        if not inSubMenu and not inActionMenu:
-            print(len(menus[menuVal]))
+        if inMainMenu:
             if menuVal < len(menus[menuVal]) -1 :
                 menuVal = menuVal + 1
                 return
             menuVal = 0
             return
-        if inSubMenu and not inActionMenu:
+        if inSubMenu:
             if subMenuVal < (len(menus[menuVal][1]) - 1):
                 subMenuVal = subMenuVal + 1
                 return
             subMenuVal = 0
             return
-        if inSubMenu:
+        if inActionMenu and not inAdjustment:
+            if actionMenuVal < (len(menus[menuVal][1][subMenuVal][1]) - 1):
+                actionMenuVal = actionMenuVal + 1
+                return
+            actionMenuVal = 0
+            return
+        if inAdjustment:
+            if actionMenuValList[actionMenuVal] < (len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]) - 1):
+                actionMenuValList[actionMenuVal] = actionMenuValList[actionMenuVal] + 1
+                return
+            actionMenuValList[actionMenuVal] = 0
             return
     if transition == 0b1011 or transition == 0b0100:
         lastStatusTime = now
-        if not inSubMenu:
+        if inMainMenu:
             if menuVal >= 1:
                 menuVal = menuVal - 1
                 return
@@ -85,13 +99,28 @@ def handleSpin(pin):
                 return
             subMenuVal = (len(menus[menuVal][1]) -1)
             return
+        if inActionMenu and not inAdjustment:
+            if actionMenuVal >= 1:
+                actionMenuVal = actionMenuVal - 1
+                return
+            actionMenuVal = (len(menus[menuVal][1][subMenuVal][1]) - 1)
+            return
+        if inAdjustment:
+            if actionMenuValList[actionMenuVal] >= 1:
+                actionMenuValList[actionMenuVal] = actionMenuValList[actionMenuVal] - 1
+                return
+            actionMenuValList[actionMenuVal] = (len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]) - 1)
+            return
+
         
 
 def handleClick(pin):
     global lastClick
     global subMenuVal
+    global inMainMenu
     global inSubMenu
     global inActionMenu
+    global inAdjustment
     global lastClickTime
     newClick = rotarySwPin.value()
     if lastClick == newClick:
@@ -102,34 +131,79 @@ def handleClick(pin):
     transition = (lastClick << 2 ) | newClick
     if transition == 0b01:
         lastClickTime = now
-        if not inSubMenu and not inActionMenu:
+        if inMainMenu:
             subMenuVal = 0
+            inMainMenu = False
             inSubMenu = True
             time.sleep(0.25)
             return
         if inSubMenu and menus[menuVal][1][subMenuVal][0][0] == "BACK":   
             inSubMenu = False
+            inMainMenu = True
+            time.sleep(0.25)
+            return
+        if inSubMenu:
+            inSubMenu = False
+            inActionMenu = True
+            actionMenuVal = 0
+            time.sleep(0.25)
+            return
+        if inActionMenu and not inAdjustment:
+            inAdjustment = True
+            time.sleep(0.25)
+            return
+        if inActionMenu and inAdjustment:
+            inAdjustment = False
             time.sleep(0.25)
             return
 
-    lastClick = newClick # I feel like this should be before the sub menu check, but it works?
+    lastClick = newClick # I feel like this should be before the menu checks, but it works?
+    # Okay, I'm pretty sure it works because the "unclick" also triggers the IRQ?
     time.sleep(0.15)
 
         
 def drawMenuDisplay():
     display.fill(0)
     display.fill_rect(0,0,128,15,1)
-    display.rect(0,16,128,48,1)    
-    display.text(menus[menuVal][0], 5, 4, 0)
-    if not inSubMenu:
+    if not inSubMenu and not inActionMenu:
+        display.text(menus[menuVal][0], 5, 4, 0)
         for x in range(0, len(menus[menuVal][1])):
-            display.text(str(menus[menuVal][1][x][0][0]), 3, 20 + (x*10), 1)
-    if inSubMenu:
+            display.text(str(menus[menuVal][1][x][0][0]), 0, 20 + (x*10), 1)
+    if inSubMenu and not inActionMenu:
+        display.text(menus[menuVal][0], 5, 4, 0)
         for x in range(0, len(menus[menuVal][1])):
             if subMenuVal == x:
-                display.text("> " + str(menus[menuVal][1][x][0][0]), 3, 20 + (x*10), 1)
+                display.text("> " + str(menus[menuVal][1][x][0][0]), 0, 20 + (x*10), 1)
             else:
-                display.text(str(menus[menuVal][1][x][0][0]), 3, 20 + (x*10), 1)            
+                display.text(str(menus[menuVal][1][x][0][0]), 0, 20 + (x*10), 1)
+    if inActionMenu:
+        display.text(str(menus[menuVal][1][subMenuVal][0][0]), 5, 4, 0)
+        for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
+            if actionMenuVal == x:
+                if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
+                    display.text(">BACK", 0, 19 + (x*9), 1)
+                elif str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "START":
+                    display.text(">START", 0, 19 + (x*9), 1)
+                else:
+                    endBracket = ""
+                    if inAdjustment:
+                        endBracket = "<"
+                    display.text(">" +
+                                str(menus[menuVal][1][subMenuVal][1][x][0][0]) +
+                                "=" +
+                                str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]) +
+                                endBracket,
+                                0, 19 + (x*9), 1)
+            else:
+                if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
+                    display.text("BACK", 0, 19 + (x*9), 1)
+                elif str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "START":
+                    display.text("START", 0, 19 + (x*9), 1)
+                else:
+                    display.text(str(menus[menuVal][1][subMenuVal][1][x][0][0]) +
+                            "=" +
+                            str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]), 0, 19 + (x*9), 1)
+                    
     display.show()
 
 def drawActionMenuDisplay():
