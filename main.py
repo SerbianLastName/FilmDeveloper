@@ -7,6 +7,7 @@ import ssd1306, onewire, ds18x20
 # My Imports
 import constants as CONST
 from menus import menuText, menus
+from tools import getNewTime
 
 
 # INIT OBJECTS
@@ -39,6 +40,7 @@ inSubMenu = False
 inActionMenu = False
 inAdjustment = False
 actionMenuValList = [0,0,1,0,0]
+lastTemp = 24.00
 
 
 def handleSpin(pin):
@@ -117,11 +119,14 @@ def handleSpin(pin):
 def handleClick(pin):
     global lastClick
     global subMenuVal
+    global inMenu
     global inMainMenu
     global inSubMenu
     global inActionMenu
     global inAdjustment
     global lastClickTime
+    global actionMenuVal
+    global actionMenuValList
     newClick = rotarySwPin.value()
     if lastClick == newClick:
         return
@@ -147,6 +152,22 @@ def handleClick(pin):
             inActionMenu = True
             actionMenuVal = 0
             time.sleep(0.25)
+            return
+        if inActionMenu and menus[menuVal][1][subMenuVal][1][actionMenuVal][0][0] == "BACK":
+            actionMenuValList = [0,0,1,0,0]
+            inActionMenu = False
+            inSubMenu = True
+            return
+        if inActionMenu and menus[menuVal][1][subMenuVal][1][actionMenuVal][0][0] == "START":
+            typeString = ""
+            for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
+                typeString = typeString + (str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]])) + " "
+            typeString.strip()
+            actionMenuValList = [0,0,1,0,0]
+            inActionMenu = False
+            inSubMenu = False
+            inMenu = False
+            developColor(typeString)
             return
         if inActionMenu and not inAdjustment:
             inAdjustment = True
@@ -224,35 +245,29 @@ def drawActionMenuDisplay():
 
 
 def readTemp():
-    dsSensor.convert_temp()
-    tempC = dsSensor.read_temp(tempProbe)
-    return round(tempC, 2)
+    global lastTemp
+    try:
+        dsSensor.convert_temp()
+        tempC = dsSensor.read_temp(tempProbe)
+        lastTemp = round(tempC, 2) 
+        return lastTemp
+    except Exception as e:
+        print(e)
+        return lastTemp
 
-
-def handleSubMenus(menu):
-    global inSubMenu
-    global inActionMenu
-    if menu == "BACK":
-        inSubMenu = False
-        inActionMenu = False
-        time.sleep(0.25)
-        return
-    if menu == "DEVELOP COLOR":
-        inSubMenu = False
-        inActionMenu = True
-        type = ""
-        exposure = 2
-        agitation = ""
-
-        
-    
 
 def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
     stepper.angle(angle)
 
-def developColor(type, exposure, agitation):
-    currentTemp = readTemp()
-    _thread.start_new_thread(moveStepper, (720, "foo"))   
+def developColor(typeString):
+    print(typeString)
+    while True:
+        temp = readTemp()
+        newTime = getNewTime(temp, str(typeString).strip())
+        print(newTime)
+        time.sleep(0.5)
+    # currentTemp = readTemp()
+    # _thread.start_new_thread(moveStepper, (720, "foo"))   
     
 
     
@@ -262,7 +277,14 @@ rotaryDtPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotaryClkPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 
-_thread.start_new_thread(moveStepper, (720, "foo"))
+# _thread.start_new_thread(moveStepper, (720, "foo"))
+# moveStepper(360, "foo")
+# moveStepper(-360, "foo")
+
+# developColor("C-41 NORM 0")
+
+# for key, val in CONST.tempTimes["C-41 NORM 0"].items():
+#     print(key, val)
 
 while inMenu == True:
     drawMenuDisplay()

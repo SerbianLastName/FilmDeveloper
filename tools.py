@@ -22,7 +22,7 @@ def getNewTime(temp, type):
         lowerTemp = higherTemp
         lowerTime = higherTime
         higherTemp = 100
-        for devTemp, devTime in CONST.tempTimes[type].items():
+        for devTemp, devTime in CONST.tempTimes[str(type).strip()].items():
             if devTemp > lowerTemp:
                 if devTemp < higherTemp:
                     higherTemp = devTemp
@@ -31,7 +31,7 @@ def getNewTime(temp, type):
         higherTemp = lowerTemp
         higherTime = lowerTime
         lowerTemp = 0
-        for devTemp, devTime in CONST.tempTimes[type].items():
+        for devTemp, devTime in CONST.tempTimes[str(type).strip()].items():
             if devTemp < higherTemp:
                 if devTemp > lowerTemp:
                     lowerTemp = devTemp
