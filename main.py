@@ -7,7 +7,7 @@ import ssd1306, onewire, ds18x20
 # My Imports
 import constants as CONST
 from menus import menuText, menus
-from tools import getNewTime
+from tools import getNewTime, convertMs
 
 
 # INIT OBJECTS
@@ -39,7 +39,13 @@ inMenu = True
 inSubMenu = False
 inActionMenu = False
 inAdjustment = False
+waitingForConfirm = False
+inDevelopment = False
+devState = ""
+confirmationText = ""
 actionMenuValList = [0,0,1,0,0]
+choices = []
+choice = 0
 lastTemp = 24.00
 
 
@@ -53,6 +59,7 @@ def handleSpin(pin):
     global inSubMenu
     global inActionMenu
     global actionMenuValList
+    global choice
     newStatus = (rotaryDtPin.value() << 1 | rotaryClkPin.value())
     if newStatus == lastStatus:
         return
@@ -62,7 +69,13 @@ def handleSpin(pin):
     transition = (lastStatus << 2 ) | newStatus
     lastStatus = newStatus  
     if transition == 0b1000 or transition == 0b0111:
-        lastStatusTime = now                     
+        lastStatusTime = now
+        if waitingForConfirm:
+            if choice < len(choices) - 1:
+                choice = choice + 1 
+                return
+            choice = 0
+            return                    
         if inMainMenu:
             if menuVal < len(menus[menuVal]) -1 :
                 menuVal = menuVal + 1
@@ -89,6 +102,12 @@ def handleSpin(pin):
             return
     if transition == 0b1011 or transition == 0b0100:
         lastStatusTime = now
+        if waitingForConfirm:
+            if choice >= 1:
+                choice = choice - 1 
+                return
+            choice = len(choices) -1
+            return
         if inMainMenu:
             if menuVal >= 1:
                 menuVal = menuVal - 1
@@ -127,6 +146,9 @@ def handleClick(pin):
     global lastClickTime
     global actionMenuVal
     global actionMenuValList
+    global waitingForConfirm
+    global choice
+    global choices
     newClick = rotarySwPin.value()
     if lastClick == newClick:
         return
@@ -136,6 +158,12 @@ def handleClick(pin):
     transition = (lastClick << 2 ) | newClick
     if transition == 0b01:
         lastClickTime = now
+        if waitingForConfirm:
+            print(choices[choice])
+        if waitingForConfirm and (choices[choice]) == "START":
+            waitingForConfirm = False
+            time.sleep(0.25)
+            return
         if inMainMenu:
             subMenuVal = 0
             inMainMenu = False
@@ -167,7 +195,7 @@ def handleClick(pin):
             inActionMenu = False
             inSubMenu = False
             inMenu = False
-            developColor(typeString)
+            developFilm(typeString)
             return
         if inActionMenu and not inAdjustment:
             inAdjustment = True
@@ -177,6 +205,7 @@ def handleClick(pin):
             inAdjustment = False
             time.sleep(0.25)
             return
+        
 
     lastClick = newClick # I feel like this should be before the menu checks, but it works?
     # Okay, I'm pretty sure it works because the "unclick" also triggers the IRQ?
@@ -194,9 +223,9 @@ def drawMenuDisplay():
         display.text(menus[menuVal][0], 5, 4, 0)
         for x in range(0, len(menus[menuVal][1])):
             if subMenuVal == x:
-                display.text("> " + str(menus[menuVal][1][x][0][0]), 0, 20 + (x*10), 1)
+                display.text("> " + str(menus[menuVal][1][x][0][0]), 0, 19 + (x*9), 1)
             else:
-                display.text(str(menus[menuVal][1][x][0][0]), 0, 20 + (x*10), 1)
+                display.text(str(menus[menuVal][1][x][0][0]), 0, 19 + (x*9), 1)
     if inActionMenu:
         display.text(str(menus[menuVal][1][subMenuVal][0][0]), 5, 4, 0)
         for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
@@ -227,20 +256,30 @@ def drawMenuDisplay():
                     
     display.show()
 
-def drawActionMenuDisplay():
+def drawDevelopDisplay(temp, theTime):
+    global choices
+    global choice
+    choices = ["START", "CANCEL"]
     display.fill(0)
     display.fill_rect(0,0,128,15,1)
-    display.rect(0,16,128,48,1)    
-    display.text(menuText[menuVal][0], 5, 4, 0)
-    if not inSubMenu:
-        for x in range(0, len(menuText[menuVal][1])):
-            display.text(menuText[menuVal][1][x], 3, 20 + (x*10), 1)
-    if inSubMenu:
-        for x in range(0, len(menuText[menuVal][1])):
-            if subMenuVal == x:
-                display.text("> " + menuText[menuVal][1][x], 3, 20 + (x*10), 1)
+    display.text("TEMP - " + str(temp) + "C", 5, 4, 0)
+    if waitingForConfirm:
+        display.text(confirmationText,0, 19, 1)
+        for x in range(len(choices)):
+            if x == choice:
+                display.text(">" + str(choices[x]), 0, 37 + (x*9), 1)
             else:
-                display.text(menuText[menuVal][1][x], 3, 20 + (x*10), 1)            
+                display.text(str(choices[x]), 0, 37 + (x*9), 1)
+    if devState == "SOAK" and not waitingForConfirm:
+        display.text("PRESOAK", 0, 19, 1)
+        display.text(str(theTime) + " REMAINING", 0, 37, 1)
+
+    # if inSubMenu:
+    #     for x in range(0, len(menuText[menuVal][1])):
+    #         if subMenuVal == x:
+    #             display.text("> " + menuText[menuVal][1][x], 3, 20 + (x*10), 1)
+    #         else:
+    #             display.text(menuText[menuVal][1][x], 3, 20 + (x*10), 1)            
     display.show()
 
 
@@ -257,19 +296,94 @@ def readTemp():
 
 
 def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
+    print("moving stepper, angle=" + str(angle))
     stepper.angle(angle)
 
-def developColor(typeString):
-    print(typeString)
-    while True:
-        temp = readTemp()
-        newTime = getNewTime(temp, str(typeString).strip())
-        print(newTime)
-        time.sleep(0.5)
+def developFilm(typeString):
+    isC41 = "C-41" in typeString
+    if isC41:
+        developC41(typeString)
+        print("done developing")
+        return
+    # while True:
+    #     temp = readTemp()
+    #     newTime = getNewTime(temp, str(typeString).strip())
+    #     print(newTime)
+    #     time.sleep(0.5)
     # currentTemp = readTemp()
     # _thread.start_new_thread(moveStepper, (720, "foo"))   
-    
 
+    
+def developC41(typeString):
+    global waitingForConfirm
+    global inDevelopment
+    global confirmationText
+    global devState
+    soakTime = 6 * 1000
+    confirmationText = "START SOAK?"
+    devState = "SOAK"
+    waitingForConfirm = True
+    inDevelopment = True
+    soakStart = 0
+    elapsed = 0
+    devStart = 0
+    devTime = 1000000000
+    devTime = 0
+    agitationCycle = 30 * 1000
+    initialAgitation = 10 * 1000
+    initialAgitationDone = False
+    blixStart = 0
+    
+    while inDevelopment:
+        temp = readTemp()
+        theTime = convertMs(0)
+        if temp >= 35:
+            agitationCycle = 30 * 1000
+            initialAgitation = 10 * 1000
+        if temp < 35 and temp >= 29.5:
+            agitationCycle = 60 * 1000
+            initialAgitation = 30 * 1000
+        if temp < 29.5:
+            agitationCycle = 120 * 1000
+            initialAgitation = 60 * 1000
+
+        if devState == "SOAK" and waitingForConfirm:
+            pass
+        if devState == "SOAK" and not waitingForConfirm:
+            if soakStart == 0:
+                soakStart = time.ticks_ms()
+            if elapsed >= soakTime:
+                waitingForConfirm = True
+                devState = "DEV"
+                confirmationText = "START DEVELOPMENT?"
+            elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
+            timeLeft = (soakTime - elapsed)
+            theTime = convertMs(timeLeft)
+        if devState == "DEV" and not waitingForConfirm:
+            devTime = getNewTime(temp, typeString)
+            if devStart == 0:
+                devStart = time.ticks_ms()
+            if elapsed >= soakTime:
+                waitingForConfirm = True
+                devState = "DEV"
+                confirmationText = "START DEVELOPMENT?"
+            if not initialAgitationDone:
+                initialAgitationDone = True
+                _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            elapsed = abs(time.ticks_diff(devStart, time.ticks_ms()))
+            timeLeft = (devTime - elapsed)
+            theTime = convertMs(timeLeft)
+        
+
+        drawDevelopDisplay(temp,theTime)
+        if waitingForConfirm:
+            time.sleep(0.15)
+        else:
+            time.sleep(0.5)
+    # start = time.ticks_ms()
+    # time.sleep(1)
+    # end = time.ticks_ms()
+    # print(abs(time.ticks_diff(start,end)))
     
 
 # Initilize Rotary Input IRQs
@@ -281,7 +395,14 @@ rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 # moveStepper(360, "foo")
 # moveStepper(-360, "foo")
 
-# developColor("C-41 NORM 0")
+developFilm("C-41 NORM 0")
+# stepStart = time.ticks_ms()
+# stepper.angle(87)
+# stepEnd = time.ticks_ms()
+# duration = abs(time.ticks_diff(stepStart, stepEnd))
+# durationFormated = convertMs(duration)
+# print(duration)
+# print(durationFormated)
 
 # for key, val in CONST.tempTimes["C-41 NORM 0"].items():
 #     print(key, val)

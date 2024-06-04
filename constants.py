@@ -26,6 +26,8 @@ STEPPER_IN4 = 19
 TEMP_DAT = 13
 # Other GPIO pins should work, these are just what I happened to use
 
+ANGLE_PER_SECOND = 87
+
 tempTimes = {   "C-41 NORM 0": 
                 {
                     22.0 : 50.00,

@@ -22,7 +22,7 @@ def getNewTime(temp, type):
         lowerTemp = higherTemp
         lowerTime = higherTime
         higherTemp = 100
-        for devTemp, devTime in CONST.tempTimes[str(type).strip()].items():
+        for devTemp, devTime in CONST.tempTimes[type].items():
             if devTemp > lowerTemp:
                 if devTemp < higherTemp:
                     higherTemp = devTemp
@@ -31,7 +31,7 @@ def getNewTime(temp, type):
         higherTemp = lowerTemp
         higherTime = lowerTime
         lowerTemp = 0
-        for devTemp, devTime in CONST.tempTimes[str(type).strip()].items():
+        for devTemp, devTime in CONST.tempTimes[type].items():
             if devTemp < higherTemp:
                 if devTemp > lowerTemp:
                     lowerTemp = devTemp
@@ -45,3 +45,18 @@ def getNewTime(temp, type):
 
 def halfStepPushPull(steps):
     pass
+
+def convertMs(ms):
+    # Convert milliseconds to total seconds
+    totalSeconds = ms // 1000
+    
+    # Calculate minutes and remaining seconds
+    minutes = totalSeconds // 60
+    seconds = totalSeconds % 60
+    
+    # Format minutes and seconds with leading zeros if necessary
+    formattedTime = "{:02}:{:02}".format(minutes, seconds)
+    
+    return formattedTime
+
+    # THANK YOU CHAT GPT!!
