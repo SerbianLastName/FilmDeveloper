@@ -47,16 +47,18 @@ def halfStepPushPull(steps):
     pass
 
 def convertMs(ms):
-    # Convert milliseconds to total seconds
     totalSeconds = ms // 1000
-    
-    # Calculate minutes and remaining seconds
     minutes = totalSeconds // 60
     seconds = totalSeconds % 60
-    
-    # Format minutes and seconds with leading zeros if necessary
     formattedTime = "{:02}:{:02}".format(minutes, seconds)
-    
     return formattedTime
 
-    # THANK YOU CHAT GPT!!
+def incrimentList(listLen, currentVal, up):
+    if up:
+        if currentVal < listLen -1:
+            return currentVal + 1
+        return 0
+    if not up:
+        if currentVal >= 1:
+            return currentVal - 1
+        return listLen -1
