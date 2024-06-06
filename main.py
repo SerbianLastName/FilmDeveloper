@@ -43,6 +43,8 @@ actionMenuValList = [0,0,1,0,0]
 choices = ["START", "CANCEL"]
 choice = 0
 lastTemp = 24.00
+lastAgitation = 0
+inAgitation = False
 
 
 def handleSpin(pin):
@@ -192,17 +194,6 @@ def drawMenuDisplay():
                                 "=" +
                                 str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]),
                                 0, 19 + (x*9), 1)
-                    
-                # else:
-                #     endBracket = ""
-                #     if inAdjustment:
-                #         endBracket = "<"
-                #     display.text(">" +
-                #                 str(menus[menuVal][1][subMenuVal][1][x][0][0]) +
-                #                 "=" +
-                #                 str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]) +
-                #                 endBracket,
-                #                 0, 19 + (x*9), 1)
             else:
                 if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
                     display.text("BACK", 0, 19 + (x*9), 1)
@@ -216,28 +207,12 @@ def drawMenuDisplay():
         display.text(str(menus[menuVal][1][subMenuVal][0][0]), 5, 4, 0)
         for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
             if actionMenuVal == x:
-                # if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
-                #     display.text(">BACK", 0, 19 + (x*9), 1)
-                # if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "START":
-                #     display.text(">START", 0, 19 + (x*9), 1)
-                # else:
                 display.text(">" +
                             str(menus[menuVal][1][subMenuVal][1][x][0][0]) +
                             "=" +
                             str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]) +
                             "<",
                             0, 19 + (x*9), 1)
-                
-                # else:
-                #     endBracket = ""
-                #     if inAdjustment:
-                #         endBracket = "<"
-                #     display.text(">" +
-                #                 str(menus[menuVal][1][subMenuVal][1][x][0][0]) +
-                #                 "=" +
-                #                 str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]) +
-                #                 endBracket,
-                #                 0, 19 + (x*9), 1)
             else:
                 if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
                     display.text("BACK", 0, 19 + (x*9), 1)
@@ -282,8 +257,13 @@ def readTemp():
 
 
 def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
-    print("moving stepper, angle=" + str(angle))
+    global lastAgitation
+    global inAgitation
+    inAgitation = True
     stepper.angle(angle)
+    lastAgitation = time.ticks_ms()
+    inAgitation = False
+
 
 
 def developFilm(typeString):
@@ -303,7 +283,7 @@ def developC41(typeString):
     global inMenu
     global menuState
     inMenu = False
-    soakTime = 6 * 1000
+    soakTime = 60 * 1000
     confirmationText = "START SOAK?"
     devState = "SOAK"
     inDevelopment = True
@@ -316,10 +296,17 @@ def developC41(typeString):
     initialAgitation = 10 * 1000
     initialAgitationDone = False
     blixStart = 0
+    blixTime = 8 * 60 * 1000
+    washStart = 0
+    washTime = 3* 60 * 1000
+    rinseStart = 0
+    rinseTime = 60 * 1000
+    rinseAgitation = 15 * 1000
     
     while inDevelopment:
         temp = readTemp()
         theTime = convertMs(0)
+        # This is a place for R&D, need to think of an elegant way to make a curve for this.
         if temp >= 35:
             agitationCycle = 30 * 1000
             initialAgitation = 10 * 1000
@@ -331,36 +318,97 @@ def developC41(typeString):
             initialAgitation = 60 * 1000
         
         if devState == "SOAK" and menuState == "confirmed":
+            elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
+            timeLeft = (soakTime - elapsed)
+            theTime = convertMs(timeLeft)
             if soakStart == 0:
                 soakStart = time.ticks_ms()
             if elapsed >= soakTime:
                 menuState = "waitingForConfirm"
                 devState = "DEV"
                 confirmationText = "START DEVELOPMENT?"
-            elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
-            timeLeft = (soakTime - elapsed)
-            theTime = convertMs(timeLeft)
+            
         if devState == "DEV" and menuState == "confirmed":
-            devTime = getNewTime(temp, typeString)
             if devStart == 0:
                 devStart = time.ticks_ms()
-            if elapsed >= soakTime:
+            devTime = getNewTime(temp, typeString)
+            now = time.ticks_ms()
+            elapsed = abs(time.ticks_diff(devStart, now))
+            agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
+            timeLeft = (devTime - elapsed)
+            theTime = convertMs(timeLeft)            
+            if elapsed >= devTime and not inAgitation:
                 menuState = "waitingForConfirm"
-                devState = "DEV"
-                confirmationText = "START DEVELOPMENT?"
+                devState = "BLIX"
+                confirmationText = "START BLIX?"
             if not initialAgitationDone:
                 initialAgitationDone = True
                 _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
-            elapsed = abs(time.ticks_diff(devStart, time.ticks_ms()))
-            timeLeft = (devTime - elapsed)
-            theTime = convertMs(timeLeft)
+            if agitationElapsed >= agitationCycle and not inAgitation:
+                if agitationCycle <= timeLeft:
+                    _thread.start_new_thread(moveStepper, ((agitationCycle / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+                else:
+                    # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
+                    _thread.start_new_thread(moveStepper, (timeLeft * 0.75, "foo"))
         
+        if devState == "BLIX" and menuState == "confirmed":
+            if blixStart == 0:
+                blixStart = time.ticks_ms()
+                initialAgitation = False
+            now = time.ticks_ms()
+            elapsed = abs(time.ticks_diff(blixStart, now))
+            agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
+            timeLeft = (blixTime - elapsed)
+            theTime = convertMs(timeLeft)
+            if elapsed >= blixTime and not inAgitation:
+                menuState = "waitingForConfirm"
+                devState = "WASH"
+                confirmationText = "START WASH?"
+            if not initialAgitationDone:
+                initialAgitationDone = True
+                _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            if agitationElapsed >= agitationCycle and not inAgitation:
+                if agitationCycle <= timeLeft:
+                    _thread.start_new_thread(moveStepper, ((agitationCycle / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+                else:
+                    # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
+                    _thread.start_new_thread(moveStepper, (timeLeft * 0.75, "foo"))
+        
+        if devState == "WASH" and menuState == "confirmed":
+            if washStart == 0:
+                washStart = time.ticks_ms()
+            now = time.ticks_ms()
+            elapsed = abs(time.ticks_diff(washStart, now))
+            timeLeft = (washTime - elapsed)
+            theTime = convertMs(timeLeft)
+            if elapsed >= washTime and not inAgitation:
+                menuState = "waitingForConfirm"
+                devState = "RINSE"
+                confirmationText = "START RINSE?"
+        
+        if devState == "RINSE" and menuState == "confirmed":
+            if rinseStart == 0:
+                rinseStart = time.ticks_ms()
+                initialAgitation = False
+            now = time.ticks_ms()
+            elapsed = abs(time.ticks_diff(blixStart, now))
+            timeLeft = (blixTime - elapsed)
+            theTime = convertMs(timeLeft)
+            if elapsed >= blixTime and not inAgitation:
+                menuState = "waitingForConfirm"
+                devState = "DONE"
+                confirmationText = "GO AGAIN?"
+            if not initialAgitationDone:
+                initialAgitationDone = True
+                _thread.start_new_thread(moveStepper, ((rinseAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            
 
         drawDevelopDisplay(temp,theTime)
-        if menuState == "waitingForConfirm":
-            time.sleep(0.15)
-        else:
+
+        if inAgitation:
             time.sleep(0.5)
+        else:
+            time.sleep(0.15)
     
 
 # Initilize Rotary Input IRQs
