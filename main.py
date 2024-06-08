@@ -4,6 +4,7 @@ import _thread
 from machine import Pin, SoftI2C
 import stepper as Stepper
 import ssd1306, onewire, ds18x20
+# from gpiozero import Buzzer
 # My Imports
 import constants as CONST
 from menus import menuText, menus
@@ -25,6 +26,10 @@ dsSensor = ds18x20.DS18X20(onewire.OneWire(dsPin))
 tempProbe = dsSensor.scan()[0]
 # STEPPER
 stepper = Stepper.create(Pin(CONST.STEPPER_IN1, Pin.OUT), Pin(CONST.STEPPER_IN2, Pin.OUT), Pin(CONST.STEPPER_IN3, Pin.OUT), Pin(CONST.STEPPER_IN4, Pin.OUT), delay = 1)
+# LED/BUZZER
+buzzer = Pin(CONST.BUZZER_PIN, Pin.OUT)
+led = Pin(CONST.LED_PIN, Pin.OUT)
+
 
 # Global Variables
 lastStatus = (rotaryDtPin.value() <<1 | rotaryClkPin.value())
@@ -108,7 +113,6 @@ def handleClick(pin):
     global actionMenuVal
     global actionMenuValList
     newClick = rotarySwPin.value()
-
     if lastClick == newClick:
         return
     now = time.ticks_ms()
@@ -118,6 +122,7 @@ def handleClick(pin):
     if transition == 0b01:
         lastClickTime = now
         if menuState == "waitingForConfirm" and choices[choice] == "START":
+            print("confirmed")
             menuState = "confirmed"
             time.sleep(0.15)
             return
@@ -139,10 +144,9 @@ def handleClick(pin):
             typeString = ""
             for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
                 typeString = typeString + (str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]])) + " "
-            typeString.strip()
-            actionMenuValList = [0,0,1,0,0]
-            menuState = "developing"
-            developFilm(typeString)
+            # For some reason, not starting the development in a new thread locks up the code, but running
+            # developFilm() in the main loop with args, works fine?  WTF?
+            _thread.start_new_thread(developFilm,(typeString.strip(), "foo"))
             return
         
         if menuState == "inSubMenu":
@@ -169,11 +173,11 @@ def handleClick(pin):
 def drawMenuDisplay():
     display.fill(0)
     display.fill_rect(0,0,128,15,1)
-    if menuState == "inMainMenu": #not inSubMenu and not inActionMenu:
+    if menuState == "inMainMenu":
         display.text(menus[menuVal][0], 5, 4, 0)
         for x in range(0, len(menus[menuVal][1])):
             display.text(str(menus[menuVal][1][x][0][0]), 0, 20 + (x*10), 1)
-    if menuState == "inSubMenu": # and not inActionMenu:
+    if menuState == "inSubMenu":
         display.text(menus[menuVal][0], 5, 4, 0)
         for x in range(0, len(menus[menuVal][1])):
             if subMenuVal == x:
@@ -237,22 +241,25 @@ def drawDevelopDisplay(temp, theTime):
                 display.text(">" + str(choices[x]), 0, 37 + (x*9), 1)
             else:
                 display.text(str(choices[x]), 0, 37 + (x*9), 1)
-    if devState == "SOAK" and menuState == "confirmed":
-        display.text("PRESOAK", 0, 19, 1)
+    if menuState == "confirmed":
+        display.text(str(devState), 0, 19, 1)
         display.text(str(theTime) + " REMAINING", 0, 37, 1)
+        if inAgitation:
+            display.text("AGITATING", 0, 46, 1)
+
 
     display.show()
 
 
 def readTemp():
     global lastTemp
+    # The temp probe will occasionally throw an error, so we do this in a try loop.
     try:
         dsSensor.convert_temp()
         tempC = dsSensor.read_temp(tempProbe)
         lastTemp = round(tempC, 2) 
         return lastTemp
     except Exception as e:
-        print(e)
         return lastTemp
 
 
@@ -264,9 +271,27 @@ def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
     lastAgitation = time.ticks_ms()
     inAgitation = False
 
+def lightsAndBuzzer():
+    x = 100
+    beeps = 5
+    while x > 0:
+        buzzer.value(1)
+        led.value(1)
+        time.sleep(0.001)
+        buzzer.value(0)
+        led.value(0)
+        time.sleep(0.001)
+        x = x -1
+        if x == 0:
+            if beeps > 0:
+                x = 100
+                beeps = beeps -1
+                time.sleep(0.25)
+                
+    
 
 
-def developFilm(typeString):
+def developFilm(typeString, foo):
     global menuState
     isC41 = "C-41" in typeString
     if isC41:
@@ -283,7 +308,7 @@ def developC41(typeString):
     global inMenu
     global menuState
     inMenu = False
-    soakTime = 60 * 1000
+    soakTime = 10 * 1000
     confirmationText = "START SOAK?"
     devState = "SOAK"
     inDevelopment = True
@@ -294,6 +319,7 @@ def developC41(typeString):
     devTime = 0
     agitationCycle = 30 * 1000
     initialAgitation = 10 * 1000
+    agitationTime = 10 * 1000
     initialAgitationDone = False
     blixStart = 0
     blixTime = 8 * 60 * 1000
@@ -303,6 +329,7 @@ def developC41(typeString):
     rinseTime = 60 * 1000
     rinseAgitation = 15 * 1000
     
+
     while inDevelopment:
         temp = readTemp()
         theTime = convertMs(0)
@@ -318,19 +345,20 @@ def developC41(typeString):
             initialAgitation = 60 * 1000
         
         if devState == "SOAK" and menuState == "confirmed":
+            if soakStart == 0:
+                soakStart = time.ticks_ms()
             elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
             timeLeft = (soakTime - elapsed)
             theTime = convertMs(timeLeft)
-            if soakStart == 0:
-                soakStart = time.ticks_ms()
             if elapsed >= soakTime:
                 menuState = "waitingForConfirm"
-                devState = "DEV"
-                confirmationText = "START DEVELOPMENT?"
+                devState = "DEVELOP"
+                confirmationText = "START DEV?"
+                lightsAndBuzzer()
             
-        if devState == "DEV" and menuState == "confirmed":
+        if devState == "DEVELOP" and menuState == "confirmed":
             if devStart == 0:
-                devStart = time.ticks_ms()
+                devStart = time.ticks_ms()         
             devTime = getNewTime(temp, typeString)
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(devStart, now))
@@ -341,20 +369,22 @@ def developC41(typeString):
                 menuState = "waitingForConfirm"
                 devState = "BLIX"
                 confirmationText = "START BLIX?"
+                lightsAndBuzzer()
+
             if not initialAgitationDone:
                 initialAgitationDone = True
                 _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
             if agitationElapsed >= agitationCycle and not inAgitation:
-                if agitationCycle <= timeLeft:
-                    _thread.start_new_thread(moveStepper, ((agitationCycle / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+                if agitationTime <= timeLeft * 0.85:
+                    _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
                 else:
                     # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
-                    _thread.start_new_thread(moveStepper, (timeLeft * 0.75, "foo"))
+                    _thread.start_new_thread(moveStepper, (timeLeft * 0.85, "foo"))
         
         if devState == "BLIX" and menuState == "confirmed":
             if blixStart == 0:
                 blixStart = time.ticks_ms()
-                initialAgitation = False
+                initialAgitationDone = False
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(blixStart, now))
             agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
@@ -364,15 +394,17 @@ def developC41(typeString):
                 menuState = "waitingForConfirm"
                 devState = "WASH"
                 confirmationText = "START WASH?"
+                lightsAndBuzzer()
+
             if not initialAgitationDone:
                 initialAgitationDone = True
                 _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
-            if agitationElapsed >= agitationCycle and not inAgitation:
-                if agitationCycle <= timeLeft:
-                    _thread.start_new_thread(moveStepper, ((agitationCycle / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            if agitationElapsed >= agitationTime and not inAgitation:
+                if agitationTime <= timeLeft * 0.85:
+                    _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
                 else:
                     # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
-                    _thread.start_new_thread(moveStepper, (timeLeft * 0.75, "foo"))
+                    _thread.start_new_thread(moveStepper, (timeLeft * 0.85, "foo"))
         
         if devState == "WASH" and menuState == "confirmed":
             if washStart == 0:
@@ -385,19 +417,23 @@ def developC41(typeString):
                 menuState = "waitingForConfirm"
                 devState = "RINSE"
                 confirmationText = "START RINSE?"
+                lightsAndBuzzer()
+
         
         if devState == "RINSE" and menuState == "confirmed":
             if rinseStart == 0:
                 rinseStart = time.ticks_ms()
-                initialAgitation = False
+                initialAgitationDone = False
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(blixStart, now))
             timeLeft = (blixTime - elapsed)
             theTime = convertMs(timeLeft)
-            if elapsed >= blixTime and not inAgitation:
+            if elapsed >= rinseTime and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "DONE"
                 confirmationText = "GO AGAIN?"
+                lightsAndBuzzer()
+
             if not initialAgitationDone:
                 initialAgitationDone = True
                 _thread.start_new_thread(moveStepper, ((rinseAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
@@ -417,6 +453,7 @@ rotaryClkPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 
 # developFilm("C-41 NORM 0")
+# lightsAndBuzzer()
 
 while inMenu == True:
     drawMenuDisplay()

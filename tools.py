@@ -41,7 +41,7 @@ def getNewTime(temp, type):
         higherTime = higherTime + 0.01    
     slope = (higherTime - lowerTime) / (higherTemp - lowerTemp) 
     newTime = lowerTime + (slope * (temp - lowerTemp))   
-    return round(newTime, 2)
+    return round(newTime * 60 * 1000, 2)
 
 def halfStepPushPull(steps):
     pass

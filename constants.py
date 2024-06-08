@@ -24,9 +24,17 @@ STEPPER_IN3 = 18
 STEPPER_IN4 = 19
 # Temp Probe
 TEMP_DAT = 13
+# LED/BUZZER
+BUZZER_PIN = 15
+LED_PIN = 2
 # Other GPIO pins should work, these are just what I happened to use
 
-ANGLE_PER_SECOND = 87
+# Development (Film) related stuff
+ANGLE_PER_SECOND = 87 # Roughly what angle the stepper can spin in one second
+C41_SOAK_TIME = 60 * 1000
+C41_BLIX_TIME = 8 * 60 * 1000
+C41_WASH_TIME = 3 * 60 * 1000
+C41_RINSE_TIME = 60 * 1000
 
 tempTimes = {   "C-41 NORM 0": 
                 {
@@ -72,7 +80,3 @@ tempTimes = {   "C-41 NORM 0":
                     39.0 : 2.75,
                 },
             }
-
-colorProcess = {
-    "C-41" : [["PRESOAK", 60, 0], ["DEVELOP", ]]
-}
