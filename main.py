@@ -101,7 +101,7 @@ def handleSpin(pin):
             actionMenuVal = incrimentList(len(menus[menuVal][1][subMenuVal][1]), actionMenuVal, False)
             return
         if menuState == "inAdjustment":
-            actionMenuValList[actionMenuVal] = incrimentList(len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]), actionMenuValList[actionMenuVal], True)
+            actionMenuValList[actionMenuVal] = incrimentList(len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]), actionMenuValList[actionMenuVal], False)
             return
 
 
