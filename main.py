@@ -271,7 +271,7 @@ def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
     global lastAgitation
     global inAgitation
     inAgitation = True
-    stepper.angle(angle)
+    stepper.angle(0 - angle)
     lastAgitation = time.ticks_ms()
     inAgitation = False
 
@@ -426,7 +426,7 @@ def developC41(typeString, rollsDeveloped):
                 rinseStart = time.ticks_ms()
                 initialAgitationDone = False
             now = time.ticks_ms()
-            elapsed = abs(time.ticks_diff(blixStart, now))
+            elapsed = abs(time.ticks_diff(rinseStart, now))
             timeLeft = (CONST.C41_RINSE_TIME - elapsed)
             theTime = convertMs(timeLeft)
             if elapsed >= CONST.C41_RINSE_TIME and not inAgitation:

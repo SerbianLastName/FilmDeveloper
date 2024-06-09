@@ -6,7 +6,7 @@ OLED_V = 64
 
 # Digita, isn't digital.
 CLICK_BOUNCE = 350 # Time in MS after a click to ignore a second click
-SPIN_BOUNCE = 25
+SPIN_BOUNCE = 150
 
 # PINS
 # Rotary
