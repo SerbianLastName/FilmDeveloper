@@ -44,7 +44,7 @@ inMenu = True
 inDevelopment = False
 devState = ""
 confirmationText = ""
-actionMenuValList = [0,0,1,0,0]
+actionMenuValList = [0,0,1,0,0,0]
 choices = ["START", "CANCEL"]
 choice = 0
 lastTemp = 24.00
@@ -142,11 +142,15 @@ def handleClick(pin):
             return
         if menuState == "inActionMenu" and menus[menuVal][1][subMenuVal][1][actionMenuVal][0][0] == "START":
             typeString = ""
+            rollsDeveloped = 0
             for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
-                typeString = typeString + (str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]])) + " "
+                if type(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]) == int:
+                    rollsDeveloped = menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]]
+                else:
+                    typeString = typeString + (str(menus[menuVal][1][subMenuVal][1][x][1][actionMenuValList[x]])) + " "
             # For some reason, not starting the development in a new thread locks up the code, but running
             # developFilm() in the main loop with args, works fine?  WTF?
-            _thread.start_new_thread(developFilm,(typeString.strip(), "foo"))
+            _thread.start_new_thread(developFilm,(typeString.strip(), rollsDeveloped))
             return
         
         if menuState == "inSubMenu":
@@ -187,6 +191,8 @@ def drawMenuDisplay():
     if menuState == "inActionMenu":
         display.text(str(menus[menuVal][1][subMenuVal][0][0]), 5, 4, 0)
         for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
+            # if actionMenuVal > 4:
+            #     x = x + (actionMenuVal - 4)
             if actionMenuVal == x:
                 if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
                     display.text(">BACK", 0, 19 + (x*9), 1)
@@ -287,20 +293,17 @@ def lightsAndBuzzer():
                 x = 100
                 beeps = beeps -1
                 time.sleep(0.25)
-                
-    
 
 
-def developFilm(typeString, foo):
+def developFilm(typeString, rollsDeveloped):
     global menuState
     isC41 = "C-41" in typeString
     if isC41:
         menuState = "waitingForConfirm"
-        developC41(typeString)
+        developC41(typeString, rollsDeveloped)
         return
-
     
-def developC41(typeString):
+def developC41(typeString, rollsDeveloped):
     global waitingForConfirm
     global inDevelopment
     global confirmationText
@@ -359,7 +362,7 @@ def developC41(typeString):
         if devState == "DEVELOP" and menuState == "confirmed":
             if devStart == 0:
                 devStart = time.ticks_ms()         
-            devTime = getNewTime(temp, typeString)
+            devTime = getNewTime(temp, typeString) * (1 + ((rollsDeveloped * 2) / 100) )
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(devStart, now))
             agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
