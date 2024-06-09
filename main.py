@@ -44,7 +44,7 @@ inMenu = True
 inDevelopment = False
 devState = ""
 confirmationText = ""
-actionMenuValList = [0,0,1,0,0,0]
+actionMenuValList = [0,1,0,0,0]
 choices = ["START", "CANCEL"]
 choice = 0
 lastTemp = 24.00
@@ -191,8 +191,6 @@ def drawMenuDisplay():
     if menuState == "inActionMenu":
         display.text(str(menus[menuVal][1][subMenuVal][0][0]), 5, 4, 0)
         for x in range(0, len(menus[menuVal][1][subMenuVal][1])):
-            # if actionMenuVal > 4:
-            #     x = x + (actionMenuVal - 4)
             if actionMenuVal == x:
                 if str(menus[menuVal][1][subMenuVal][1][x][0][0]) == "BACK":
                     display.text(">BACK", 0, 19 + (x*9), 1)
@@ -351,9 +349,9 @@ def developC41(typeString, rollsDeveloped):
             if soakStart == 0:
                 soakStart = time.ticks_ms()
             elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
-            timeLeft = (soakTime - elapsed)
+            timeLeft = (CONST.C41_SOAK_TIME - elapsed)
             theTime = convertMs(timeLeft)
-            if elapsed >= soakTime:
+            if elapsed >= CONST.C41_SOAK_TIME:
                 menuState = "waitingForConfirm"
                 devState = "DEVELOP"
                 confirmationText = "START DEV?"
@@ -391,9 +389,9 @@ def developC41(typeString, rollsDeveloped):
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(blixStart, now))
             agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
-            timeLeft = (blixTime - elapsed)
+            timeLeft = (CONST.C41_BLIX_TIME - elapsed)
             theTime = convertMs(timeLeft)
-            if elapsed >= blixTime and not inAgitation:
+            if elapsed >= CONST.C41_BLIX_TIME and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "WASH"
                 confirmationText = "START WASH?"
@@ -414,9 +412,9 @@ def developC41(typeString, rollsDeveloped):
                 washStart = time.ticks_ms()
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(washStart, now))
-            timeLeft = (washTime - elapsed)
+            timeLeft = (CONST.C41_WASH_TIME - elapsed)
             theTime = convertMs(timeLeft)
-            if elapsed >= washTime and not inAgitation:
+            if elapsed >= CONST.C41_WASH_TIME and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "RINSE"
                 confirmationText = "START RINSE?"
@@ -429,9 +427,9 @@ def developC41(typeString, rollsDeveloped):
                 initialAgitationDone = False
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(blixStart, now))
-            timeLeft = (blixTime - elapsed)
+            timeLeft = (CONST.C41_RINSE_TIME - elapsed)
             theTime = convertMs(timeLeft)
-            if elapsed >= rinseTime and not inAgitation:
+            if elapsed >= CONST.C41_RINSE_TIME and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "DONE"
                 confirmationText = "GO AGAIN?"
