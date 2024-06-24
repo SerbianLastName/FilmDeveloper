@@ -122,7 +122,7 @@ def handleClick(pin):
     if transition == 0b01:
         lastClickTime = now
         if menuState == "waitingForConfirm" and choices[choice] == "START":
-            print("confirmed")
+            # print("confirmed")
             menuState = "confirmed"
             time.sleep(0.15)
             return
@@ -261,8 +261,8 @@ def readTemp():
     try:
         dsSensor.convert_temp()
         tempC = dsSensor.read_temp(tempProbe)
-        lastTemp = round(tempC, 2) 
-        return lastTemp
+        newTemp = round(tempC, 2)
+        return newTemp
     except Exception as e:
         return lastTemp
 
@@ -309,25 +309,21 @@ def developC41(typeString, rollsDeveloped):
     global inMenu
     global menuState
     inMenu = False
-    soakTime = 10 * 1000
     confirmationText = "START SOAK?"
     devState = "SOAK"
     inDevelopment = True
     soakStart = 0
     elapsed = 0
     devStart = 0
-    devTime = 1000000000
+    devTime = 0
     devTime = 0
     agitationCycle = 30 * 1000
     initialAgitation = 10 * 1000
     agitationTime = 10 * 1000
     initialAgitationDone = False
     blixStart = 0
-    blixTime = 8 * 60 * 1000
     washStart = 0
-    washTime = 3* 60 * 1000
     rinseStart = 0
-    rinseTime = 60 * 1000
     rinseAgitation = 15 * 1000
     
 
@@ -348,9 +344,11 @@ def developC41(typeString, rollsDeveloped):
         if devState == "SOAK" and menuState == "confirmed":
             if soakStart == 0:
                 soakStart = time.ticks_ms()
+            
             elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
             timeLeft = (CONST.C41_SOAK_TIME - elapsed)
             theTime = convertMs(timeLeft)
+            
             if elapsed >= CONST.C41_SOAK_TIME:
                 menuState = "waitingForConfirm"
                 devState = "DEVELOP"
@@ -359,14 +357,27 @@ def developC41(typeString, rollsDeveloped):
             
         if devState == "DEVELOP" and menuState == "confirmed":
             if devStart == 0:
-                devStart = time.ticks_ms()         
-            devTime = getNewTime(temp, typeString) * (1 + ((rollsDeveloped * 2) / 100) )
+                devStart = time.ticks_ms()
+
+            newTime = getNewTime(temp, typeString) * (1 + ((rollsDeveloped * 2) / 100))
+
+            if devTime == 0:
+                devTime = newTime
+
+            if newTime < 2.75 * 60 * 1000:
+                devTime = 2.75 * 60 * 1000
+            elif abs(devTime - newTime) > 5 * 60 * 1000:
+                devTime = (newTime + devTime + devTime) / 3
+            else:
+                devTime = newTime
+            
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(devStart, now))
             agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
             timeLeft = (devTime - elapsed)
-            theTime = convertMs(timeLeft)            
-            if elapsed >= devTime and not inAgitation:
+            theTime = convertMs(timeLeft)
+
+            if elapsed > devTime and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "BLIX"
                 confirmationText = "START BLIX?"
@@ -375,6 +386,7 @@ def developC41(typeString, rollsDeveloped):
             if not initialAgitationDone:
                 initialAgitationDone = True
                 _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            
             if agitationElapsed >= agitationCycle and not inAgitation:
                 if agitationTime <= timeLeft * 0.85:
                     _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
@@ -386,11 +398,13 @@ def developC41(typeString, rollsDeveloped):
             if blixStart == 0:
                 blixStart = time.ticks_ms()
                 initialAgitationDone = False
+            
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(blixStart, now))
             agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
             timeLeft = (CONST.C41_BLIX_TIME - elapsed)
             theTime = convertMs(timeLeft)
+            
             if elapsed >= CONST.C41_BLIX_TIME and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "WASH"
@@ -400,6 +414,7 @@ def developC41(typeString, rollsDeveloped):
             if not initialAgitationDone:
                 initialAgitationDone = True
                 _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            
             if agitationElapsed >= agitationTime and not inAgitation:
                 if agitationTime <= timeLeft * 0.85:
                     _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
@@ -410,10 +425,12 @@ def developC41(typeString, rollsDeveloped):
         if devState == "WASH" and menuState == "confirmed":
             if washStart == 0:
                 washStart = time.ticks_ms()
+            
             now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(washStart, now))
             timeLeft = (CONST.C41_WASH_TIME - elapsed)
             theTime = convertMs(timeLeft)
+            
             if elapsed >= CONST.C41_WASH_TIME and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "RINSE"
@@ -443,9 +460,9 @@ def developC41(typeString, rollsDeveloped):
         drawDevelopDisplay(temp,theTime)
 
         if inAgitation:
-            time.sleep(0.5)
+            time.sleep(1)
         else:
-            time.sleep(0.15)
+            time.sleep(0.1)
     
 
 # Initilize Rotary Input IRQs
@@ -455,6 +472,8 @@ rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 
 # developFilm("C-41 NORM 0")
 # lightsAndBuzzer()
+
+# moveStepper(-360, "foo")
 
 while inMenu == True:
     drawMenuDisplay()

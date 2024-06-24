@@ -36,9 +36,11 @@ def getNewTime(temp, type):
                 if devTemp > lowerTemp:
                     lowerTemp = devTemp
                     lowerTime = devTime
-    # I don't think I need to worry about dividing by 0 here, but whatever
-    if (higherTime - lowerTime) == (higherTemp - lowerTemp):
-        higherTime = higherTime + 0.01    
+    # I don't think I need to worry about dividing by 0 here, but I'd rather be safe
+    if (higherTime - lowerTime) == 0:
+        higherTime = higherTime + 1
+    if (higherTemp - lowerTemp) == 0:
+        higherTemp = higherTemp + 1
     slope = (higherTime - lowerTime) / (higherTemp - lowerTemp) 
     newTime = lowerTime + (slope * (temp - lowerTemp))   
     return round(newTime * 60 * 1000, 2)
