@@ -8,7 +8,7 @@ import ssd1306, onewire, ds18x20
 # My Imports
 import constants as CONST
 from menus import menuText, menus
-from tools import getNewTime, convertMs, incrimentList
+from tools import getNewTime, convertMs, incrementList
 
 
 # INIT OBJECTS
@@ -25,7 +25,8 @@ dsPin = Pin(CONST.TEMP_DAT)
 dsSensor = ds18x20.DS18X20(onewire.OneWire(dsPin))
 tempProbe = dsSensor.scan()[0]
 # STEPPER
-stepper = Stepper.create(Pin(CONST.STEPPER_IN1, Pin.OUT), Pin(CONST.STEPPER_IN2, Pin.OUT), Pin(CONST.STEPPER_IN3, Pin.OUT), Pin(CONST.STEPPER_IN4, Pin.OUT), delay = 1)
+# stepper = Stepper.create(Pin(CONST.STEPPER_IN1, Pin.OUT), Pin(CONST.STEPPER_IN2, Pin.OUT), Pin(CONST.STEPPER_IN3, Pin.OUT), Pin(CONST.STEPPER_IN4, Pin.OUT), delay = 1)
+stepper = Pin(22, Pin.OUT)
 # LED/BUZZER
 buzzer = Pin(CONST.BUZZER_PIN, Pin.OUT)
 led = Pin(CONST.LED_PIN, Pin.OUT)
@@ -36,6 +37,7 @@ lastStatus = (rotaryDtPin.value() <<1 | rotaryClkPin.value())
 lastStatusTime = time.ticks_ms()
 lastClick = 0
 lastClickTime = time.ticks_ms()
+agitationStartTime = time.ticks_ms()
 menuVal = 0
 subMenuVal = 0
 actionMenuVal = 0
@@ -49,7 +51,6 @@ choices = ["START", "CANCEL"]
 choice = 0
 lastTemp = 24.00
 lastAgitation = 0
-inAgitation = False
 
 
 def handleSpin(pin):
@@ -72,36 +73,36 @@ def handleSpin(pin):
     if transition == 0b1000 or transition == 0b0111:
         lastStatusTime = now
         if menuState == "waitingForConfirm":
-            choice = incrimentList(len(choices), choice, True)            
+            choice = incrementList(len(choices), choice, True)            
             return                    
         if menuState == "inMainMenu":
-            menuVal = incrimentList(len(menus[menuVal]), menuVal, True)
+            menuVal = incrementList(len(menus[menuVal]), menuVal, True)
             return
         if menuState == "inSubMenu":
-            subMenuVal = incrimentList(len(menus[menuVal][1]), subMenuVal, True)
+            subMenuVal = incrementList(len(menus[menuVal][1]), subMenuVal, True)
             return
         if menuState == "inActionMenu":
-            actionMenuVal = incrimentList(len(menus[menuVal][1][subMenuVal][1]), actionMenuVal, True)
+            actionMenuVal = incrementList(len(menus[menuVal][1][subMenuVal][1]), actionMenuVal, True)
             return
         if menuState == "inAdjustment":
-            actionMenuValList[actionMenuVal] = incrimentList(len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]), actionMenuValList[actionMenuVal], True)
+            actionMenuValList[actionMenuVal] = incrementList(len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]), actionMenuValList[actionMenuVal], True)
             return
     if transition == 0b1011 or transition == 0b0100:
         lastStatusTime = now
         if menuState == "waitingForConfirm":
-            choice = incrimentList(len(choices), choice, False)            
+            choice = incrementList(len(choices), choice, False)            
             return                    
         if menuState == "inMainMenu":
-            menuVal = incrimentList(len(menus[menuVal]), menuVal, False)
+            menuVal = incrementList(len(menus[menuVal]), menuVal, False)
             return
         if menuState == "inSubMenu":
-            subMenuVal = incrimentList(len(menus[menuVal][1]), subMenuVal, False)
+            subMenuVal = incrementList(len(menus[menuVal][1]), subMenuVal, False)
             return
         if menuState == "inActionMenu":
-            actionMenuVal = incrimentList(len(menus[menuVal][1][subMenuVal][1]), actionMenuVal, False)
+            actionMenuVal = incrementList(len(menus[menuVal][1][subMenuVal][1]), actionMenuVal, False)
             return
         if menuState == "inAdjustment":
-            actionMenuValList[actionMenuVal] = incrimentList(len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]), actionMenuValList[actionMenuVal], False)
+            actionMenuValList[actionMenuVal] = incrementList(len(menus[menuVal][1][subMenuVal][1][actionMenuVal][1]), actionMenuValList[actionMenuVal], False)
             return
 
 
@@ -122,7 +123,6 @@ def handleClick(pin):
     if transition == 0b01:
         lastClickTime = now
         if menuState == "waitingForConfirm" and choices[choice] == "START":
-            # print("confirmed")
             menuState = "confirmed"
             time.sleep(0.15)
             return
@@ -275,6 +275,9 @@ def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
     lastAgitation = time.ticks_ms()
     inAgitation = False
 
+def checkAgitationTime():
+    pass
+
 def lightsAndBuzzer():
     x = 100
     beeps = 5
@@ -300,7 +303,8 @@ def developFilm(typeString, rollsDeveloped):
         menuState = "waitingForConfirm"
         developC41(typeString, rollsDeveloped)
         return
-    
+
+   
 def developC41(typeString, rollsDeveloped):
     global waitingForConfirm
     global inDevelopment
@@ -308,6 +312,9 @@ def developC41(typeString, rollsDeveloped):
     global devState
     global inMenu
     global menuState
+    global agitationStartTime
+    global stepper
+    inAgitation = False
     inMenu = False
     confirmationText = "START SOAK?"
     devState = "SOAK"
@@ -325,7 +332,8 @@ def developC41(typeString, rollsDeveloped):
     washStart = 0
     rinseStart = 0
     rinseAgitation = 15 * 1000
-    
+    agitationStartTime = 0
+    currentAgitationTime = 0
 
     while inDevelopment:
         temp = readTemp()
@@ -377,22 +385,40 @@ def developC41(typeString, rollsDeveloped):
             timeLeft = (devTime - elapsed)
             theTime = convertMs(timeLeft)
 
-            if elapsed > devTime and not inAgitation:
+            if elapsed >= devTime and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "BLIX"
                 confirmationText = "START BLIX?"
                 lightsAndBuzzer()
 
-            if not initialAgitationDone:
-                initialAgitationDone = True
-                _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+            if not initialAgitationDone and not inAgitation:
+                stepper.value(1)
+                inAgitation = True
+                currentAgitationTime = initialAgitation
+                agitationStartTime = time.ticks_ms()
+                # initialAgitationDone = True                                
+                # _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
             
             if agitationElapsed >= agitationCycle and not inAgitation:
                 if agitationTime <= timeLeft * 0.85:
-                    _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+                    # _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
+                    stepper.value(1)
+                    inAgitation = True
+                    currentAgitationTime = agitationTime
+                    agitationStartTime = time.ticks_ms()
                 else:
                     # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
-                    _thread.start_new_thread(moveStepper, (timeLeft * 0.85, "foo"))
+                    # _thread.start_new_thread(moveStepper, (timeLeft * 0.85, "foo"))
+                    stepper.value(1)
+                    inAgitation = True
+                    currentAgitationTime = timeLeft * 0.85
+                    agitationStartTime = time.ticks_ms()
+            
+            if inAgitation:
+                if abs(time.ticks_diff(agitationStartTime), now) >= currentAgitationTime:
+                    inAgitation = False
+                    stepper.value(0)
+                    initialAgitationDone = True
         
         if devState == "BLIX" and menuState == "confirmed":
             if blixStart == 0:

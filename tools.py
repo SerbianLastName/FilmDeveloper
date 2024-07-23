@@ -55,7 +55,7 @@ def convertMs(ms):
     formattedTime = "{:02}:{:02}".format(minutes, seconds)
     return formattedTime
 
-def incrimentList(listLen, currentVal, up):
+def incrementList(listLen, currentVal, up):
     if up:
         if currentVal < listLen -1:
             return currentVal + 1
