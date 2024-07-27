@@ -27,6 +27,7 @@ tempProbe = dsSensor.scan()[0]
 # STEPPER
 # stepper = Stepper.create(Pin(CONST.STEPPER_IN1, Pin.OUT), Pin(CONST.STEPPER_IN2, Pin.OUT), Pin(CONST.STEPPER_IN3, Pin.OUT), Pin(CONST.STEPPER_IN4, Pin.OUT), delay = 1)
 stepper = Pin(22, Pin.OUT)
+motor = Pin(CONST.MOTOR_PIN, Pin.OUT)
 # LED/BUZZER
 buzzer = Pin(CONST.BUZZER_PIN, Pin.OUT)
 led = Pin(CONST.LED_PIN, Pin.OUT)
@@ -37,13 +38,14 @@ lastStatus = (rotaryDtPin.value() <<1 | rotaryClkPin.value())
 lastStatusTime = time.ticks_ms()
 lastClick = 0
 lastClickTime = time.ticks_ms()
-agitationStartTime = time.ticks_ms()
+# agitationStartTime = time.ticks_ms()
 menuVal = 0
 subMenuVal = 0
 actionMenuVal = 0
 menuState = "inMainMenu"
 inMenu = True
 inDevelopment = False
+inAgitation = False
 devState = ""
 confirmationText = ""
 actionMenuValList = [0,1,0,0,0]
@@ -266,18 +268,6 @@ def readTemp():
     except Exception as e:
         return lastTemp
 
-
-def moveStepper(angle, foo): # _thread is wierd and wants a tuple for args?
-    global lastAgitation
-    global inAgitation
-    inAgitation = True
-    stepper.angle(0 - angle)
-    lastAgitation = time.ticks_ms()
-    inAgitation = False
-
-def checkAgitationTime():
-    pass
-
 def lightsAndBuzzer():
     x = 100
     beeps = 5
@@ -295,7 +285,6 @@ def lightsAndBuzzer():
                 beeps = beeps -1
                 time.sleep(0.25)
 
-
 def developFilm(typeString, rollsDeveloped):
     global menuState
     isC41 = "C-41" in typeString
@@ -312,9 +301,9 @@ def developC41(typeString, rollsDeveloped):
     global devState
     global inMenu
     global menuState
-    global agitationStartTime
     global stepper
-    inAgitation = False
+    lastAgitation = 0
+    # agitationStartTime = 0
     inMenu = False
     confirmationText = "START SOAK?"
     devState = "SOAK"
@@ -323,21 +312,59 @@ def developC41(typeString, rollsDeveloped):
     elapsed = 0
     devStart = 0
     devTime = 0
-    devTime = 0
     agitationCycle = 30 * 1000
     initialAgitation = 10 * 1000
     agitationTime = 10 * 1000
     initialAgitationDone = False
+    # doingInitialAgitation = False
     blixStart = 0
     washStart = 0
     rinseStart = 0
-    rinseAgitation = 15 * 1000
-    agitationStartTime = 0
-    currentAgitationTime = 0
+    # rinseAgitation = 15 * 1000
+    # agitationStartTime = 0
+    # currentAgitationTime = 0
+    lastAgitation = 0
+    # spinning = False
+    # inAgitation = False
+    
+    
+    
+    
+    
+    def checkAgitation():
+        now = time.ticks_ms()
+        global inAgitation
+        nonlocal lastAgitation
+        nonlocal initialAgitationDone
+        nonlocal agitationTime
+        nonlocal timeLeft
+        def agitate():
+            nonlocal lastAgitation
+            global inAgitation
+            motor.value(1)
+            lastAgitation = now
+            inAgitation = True        
+        if not inAgitation:            
+            if not initialAgitationDone:
+                agitationTime = initialAgitation
+                agitate()
+            if abs(time.ticks_diff(lastAgitation, now)) >= agitationCycle:                
+                if (timeLeft * 0.85) >= agitationTime and initialAgitationDone:
+                    agitate()
+                if (timeLeft * 0.85) < agitationTime and initialAgitationDone:
+                    agitationTime = (timeLeft * 0.85)
+                    agitate()
+        if inAgitation:
+            if abs(time.ticks_diff(lastAgitation, now)) >= agitationTime:
+                motor.value(0)
+                inAgitation = False
+                initialAgitationDone = True
+                
 
     while inDevelopment:
         temp = readTemp()
         theTime = convertMs(0)
+        now = time.ticks_ms()        
         # This is a place for R&D, need to think of an elegant way to make a curve for this.
         if temp >= 35:
             agitationCycle = 30 * 1000
@@ -351,12 +378,13 @@ def developC41(typeString, rollsDeveloped):
         
         if devState == "SOAK" and menuState == "confirmed":
             if soakStart == 0:
-                soakStart = time.ticks_ms()
+                print("SOAK START", now)
+                soakStart = now
             
-            elapsed = abs(time.ticks_diff(soakStart, time.ticks_ms()))
+            elapsed = abs(time.ticks_diff(soakStart, now))
             timeLeft = (CONST.C41_SOAK_TIME - elapsed)
             theTime = convertMs(timeLeft)
-            
+            print(elapsed)
             if elapsed >= CONST.C41_SOAK_TIME:
                 menuState = "waitingForConfirm"
                 devState = "DEVELOP"
@@ -364,8 +392,9 @@ def developC41(typeString, rollsDeveloped):
                 lightsAndBuzzer()
             
         if devState == "DEVELOP" and menuState == "confirmed":
+            
             if devStart == 0:
-                devStart = time.ticks_ms()
+                devStart = now
 
             newTime = getNewTime(temp, typeString) * (1 + ((rollsDeveloped * 2) / 100))
 
@@ -374,14 +403,12 @@ def developC41(typeString, rollsDeveloped):
 
             if newTime < 2.75 * 60 * 1000:
                 devTime = 2.75 * 60 * 1000
-            elif abs(devTime - newTime) > 5 * 60 * 1000:
-                devTime = (newTime + devTime + devTime) / 3
+            # elif abs(devTime - newTime) > 10 * 60 * 1000:
+            #     devTime = (newTime + devTime + devTime) / 3
             else:
                 devTime = newTime
             
-            now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(devStart, now))
-            agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
             timeLeft = (devTime - elapsed)
             theTime = convertMs(timeLeft)
 
@@ -390,44 +417,15 @@ def developC41(typeString, rollsDeveloped):
                 devState = "BLIX"
                 confirmationText = "START BLIX?"
                 lightsAndBuzzer()
+            
+            checkAgitation()
 
-            if not initialAgitationDone and not inAgitation:
-                stepper.value(1)
-                inAgitation = True
-                currentAgitationTime = initialAgitation
-                agitationStartTime = time.ticks_ms()
-                # initialAgitationDone = True                                
-                # _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
-            
-            if agitationElapsed >= agitationCycle and not inAgitation:
-                if agitationTime <= timeLeft * 0.85:
-                    # _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
-                    stepper.value(1)
-                    inAgitation = True
-                    currentAgitationTime = agitationTime
-                    agitationStartTime = time.ticks_ms()
-                else:
-                    # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
-                    # _thread.start_new_thread(moveStepper, (timeLeft * 0.85, "foo"))
-                    stepper.value(1)
-                    inAgitation = True
-                    currentAgitationTime = timeLeft * 0.85
-                    agitationStartTime = time.ticks_ms()
-            
-            if inAgitation:
-                if abs(time.ticks_diff(agitationStartTime), now) >= currentAgitationTime:
-                    inAgitation = False
-                    stepper.value(0)
-                    initialAgitationDone = True
-        
         if devState == "BLIX" and menuState == "confirmed":
             if blixStart == 0:
-                blixStart = time.ticks_ms()
+                blixStart = now
                 initialAgitationDone = False
             
-            now = time.ticks_ms()
             elapsed = abs(time.ticks_diff(blixStart, now))
-            agitationElapsed = abs(time.ticks_diff(lastAgitation, now))
             timeLeft = (CONST.C41_BLIX_TIME - elapsed)
             theTime = convertMs(timeLeft)
             
@@ -436,23 +434,13 @@ def developC41(typeString, rollsDeveloped):
                 devState = "WASH"
                 confirmationText = "START WASH?"
                 lightsAndBuzzer()
-
-            if not initialAgitationDone:
-                initialAgitationDone = True
-                _thread.start_new_thread(moveStepper, ((initialAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
             
-            if agitationElapsed >= agitationTime and not inAgitation:
-                if agitationTime <= timeLeft * 0.85:
-                    _thread.start_new_thread(moveStepper, ((agitationTime / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
-                else:
-                    # need to experiment a bit, since I can probably get a higher percentage of last agitation done.
-                    _thread.start_new_thread(moveStepper, (timeLeft * 0.85, "foo"))
+            checkAgitation()
         
         if devState == "WASH" and menuState == "confirmed":
             if washStart == 0:
-                washStart = time.ticks_ms()
-            
-            now = time.ticks_ms()
+                washStart = now
+                
             elapsed = abs(time.ticks_diff(washStart, now))
             timeLeft = (CONST.C41_WASH_TIME - elapsed)
             theTime = convertMs(timeLeft)
@@ -466,37 +454,33 @@ def developC41(typeString, rollsDeveloped):
         
         if devState == "RINSE" and menuState == "confirmed":
             if rinseStart == 0:
-                rinseStart = time.ticks_ms()
+                rinseStart = now
                 initialAgitationDone = False
-            now = time.ticks_ms()
+                
             elapsed = abs(time.ticks_diff(rinseStart, now))
             timeLeft = (CONST.C41_RINSE_TIME - elapsed)
             theTime = convertMs(timeLeft)
+            agitationCycle = (CONST.C41_RINSE_TIME * 2)
+            
             if elapsed >= CONST.C41_RINSE_TIME and not inAgitation:
                 menuState = "waitingForConfirm"
                 devState = "DONE"
                 confirmationText = "GO AGAIN?"
                 lightsAndBuzzer()
-
-            if not initialAgitationDone:
-                initialAgitationDone = True
-                _thread.start_new_thread(moveStepper, ((rinseAgitation / 1000) * CONST.ANGLE_PER_SECOND, "foo"))
-            
+                
+        checkAgitation()
 
         drawDevelopDisplay(temp,theTime)
 
-        if inAgitation:
-            time.sleep(1)
-        else:
-            time.sleep(0.1)
-    
+        time.sleep(0.25)
+     
 
 # Initilize Rotary Input IRQs
 rotaryDtPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotaryClkPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 
-# developFilm("C-41 NORM 0")
+developFilm("C-41 NORM 0", 0)
 # lightsAndBuzzer()
 
 # moveStepper(-360, "foo")
