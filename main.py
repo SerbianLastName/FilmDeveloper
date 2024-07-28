@@ -2,14 +2,14 @@
 import utime as time
 import _thread
 from machine import Pin, SoftI2C
-import stepper as Stepper
+import json
+# import stepper as Stepper
 import ssd1306, onewire, ds18x20
 # from gpiozero import Buzzer
 # My Imports
 import constants as CONST
 from menus import menuText, menus
 from tools import getNewTime, convertMs, incrementList
-
 
 # INIT OBJECTS
 
@@ -25,8 +25,6 @@ dsPin = Pin(CONST.TEMP_DAT)
 dsSensor = ds18x20.DS18X20(onewire.OneWire(dsPin))
 tempProbe = dsSensor.scan()[0]
 # STEPPER
-# stepper = Stepper.create(Pin(CONST.STEPPER_IN1, Pin.OUT), Pin(CONST.STEPPER_IN2, Pin.OUT), Pin(CONST.STEPPER_IN3, Pin.OUT), Pin(CONST.STEPPER_IN4, Pin.OUT), delay = 1)
-stepper = Pin(22, Pin.OUT)
 motor = Pin(CONST.MOTOR_PIN, Pin.OUT)
 # LED/BUZZER
 buzzer = Pin(CONST.BUZZER_PIN, Pin.OUT)
@@ -38,7 +36,6 @@ lastStatus = (rotaryDtPin.value() <<1 | rotaryClkPin.value())
 lastStatusTime = time.ticks_ms()
 lastClick = 0
 lastClickTime = time.ticks_ms()
-# agitationStartTime = time.ticks_ms()
 menuVal = 0
 subMenuVal = 0
 actionMenuVal = 0
@@ -54,7 +51,35 @@ choice = 0
 lastTemp = 24.00
 lastAgitation = 0
 
+settings = {
+    "sound" : True,
+    "led" : True,
+    "autoIncrementRolls" : True,
+    "rollsDeveloped" : 52    
+}
 
+def loadSettings():
+    global settings
+    global actionMenuValList
+    with open("settings.json", 'r') as file:
+            try:
+                tempSettings = json.load(file)
+                sound = tempSettings.get("sound")
+                led = tempSettings.get("led")
+                autoIncrementRolls = tempSettings.get("autoIncrementRolls")
+                rollsDeveloped = tempSettings.get("rollsDeveloped")
+                if type(sound) == bool and type(led) == bool and type(autoIncrementRolls) == bool and type(rollsDeveloped) == int:
+                    settings = tempSettings 
+                    actionMenuValList[4] = settings.get("rollsDeveloped") 
+            except:
+                pass
+       
+
+def saveSettings():    
+    with open("settings.json", 'w') as file:
+        json.dump(settings, file)
+        
+        
 def handleSpin(pin):
     global lastStatus
     global lastStatusTime
@@ -268,6 +293,7 @@ def readTemp():
     except Exception as e:
         return lastTemp
 
+
 def lightsAndBuzzer():
     x = 100
     beeps = 5
@@ -284,6 +310,7 @@ def lightsAndBuzzer():
                 x = 100
                 beeps = beeps -1
                 time.sleep(0.25)
+
 
 def developFilm(typeString, rollsDeveloped):
     global menuState
@@ -303,7 +330,6 @@ def developC41(typeString, rollsDeveloped):
     global menuState
     global stepper
     lastAgitation = 0
-    # agitationStartTime = 0
     inMenu = False
     confirmationText = "START SOAK?"
     devState = "SOAK"
@@ -316,19 +342,10 @@ def developC41(typeString, rollsDeveloped):
     initialAgitation = 10 * 1000
     agitationTime = 10 * 1000
     initialAgitationDone = False
-    # doingInitialAgitation = False
     blixStart = 0
     washStart = 0
     rinseStart = 0
-    # rinseAgitation = 15 * 1000
-    # agitationStartTime = 0
-    # currentAgitationTime = 0
     lastAgitation = 0
-    # spinning = False
-    # inAgitation = False
-    
-    
-    
     
     
     def checkAgitation():
@@ -378,13 +395,11 @@ def developC41(typeString, rollsDeveloped):
         
         if devState == "SOAK" and menuState == "confirmed":
             if soakStart == 0:
-                print("SOAK START", now)
                 soakStart = now
             
             elapsed = abs(time.ticks_diff(soakStart, now))
             timeLeft = (CONST.C41_SOAK_TIME - elapsed)
             theTime = convertMs(timeLeft)
-            print(elapsed)
             if elapsed >= CONST.C41_SOAK_TIME:
                 menuState = "waitingForConfirm"
                 devState = "DEVELOP"
@@ -480,14 +495,15 @@ rotaryDtPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotaryClkPin.irq(handler=handleSpin, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 rotarySwPin.irq(handler=handleClick, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
 
-developFilm("C-41 NORM 0", 0)
+
+loadSettings()
+# developFilm("C-41 0", 0)
 # lightsAndBuzzer()
 
-# moveStepper(-360, "foo")
 
 while inMenu == True:
     drawMenuDisplay()
-    time.sleep(0.15)
+    time.sleep(0.1)
 
 
 
